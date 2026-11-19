@@ -1,8 +1,5 @@
 import { useState } from 'react'
 
-const SYSTEM_PROMPT =
-  'Eres un experto en contexto para LLMs. Limpia este texto de menús, barras laterales y metadatos. Devuélvelo en Markdown estructurado, optimizado para que un agente de IA lo entienda rápido y gaste el mínimo de tokens'
-
 function App() {
   const [url, setUrl] = useState('')
   const [result, setResult] = useState('')
@@ -24,12 +21,6 @@ function App() {
       return
     }
 
-    const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY
-    if (!apiKey) {
-      setError('Falta VITE_DEEPSEEK_API_KEY. Créala en un archivo .env y reinicia Vite.')
-      return
-    }
-
     setLoading(true)
     setError('')
     setCopied(false)
@@ -47,47 +38,27 @@ function App() {
         throw new Error('La página no devolvió texto.')
       }
 
-      setStatus('Comprobando el saldo…')
-      const balanceResponse = await fetch('https://api.deepseek.com/user/balance', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-      })
-      const balance = await balanceResponse.json().catch(() => null)
-      if (!balanceResponse.ok) {
-        const message = balance?.error?.message || `No se pudo comprobar el saldo (${balanceResponse.status}).`
-        throw new Error(message)
-      }
-      if (balance?.is_available === false) {
-        throw new Error('Servicio no disponible temporalmente (sin saldo)')
-      }
-
-      setStatus('Limpiando el texto…')
-      const completionResponse = await fetch('https://api.deepseek.com/chat/completions', {
+      setStatus('Limpiando el texto de forma segura…')
+      // Aquí llamamos a NUESTRO servidor seguro en Vercel
+      const completionResponse = await fetch('/api/limpiar', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: sourceText },
-          ],
+          texto: sourceText,
         }),
       })
 
       const data = await completionResponse.json().catch(() => null)
       if (!completionResponse.ok) {
-        const message = data?.error?.message || `DeepSeek respondió ${completionResponse.status}.`
+        const message = data?.error || `El servidor respondió ${completionResponse.status}.`
         throw new Error(message)
       }
 
       const content = data?.choices?.[0]?.message?.content?.trim()
       if (!content) {
-        throw new Error('DeepSeek no devolvió texto.')
+        throw new Error('El servidor no devolvió texto.')
       }
 
       setResult(content)
